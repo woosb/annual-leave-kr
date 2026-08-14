@@ -1,0 +1,15 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+.idea/
+*.iml
+out/
+
+.DS_Store
+
+# 서명 키가 실수로 커밋되는 걸 막는다
+*.gpg
+*.asc
+secring.*
+local.properties

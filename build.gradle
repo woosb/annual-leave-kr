@@ -1,0 +1,118 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+}
+
+group = 'io.github.woosb'
+version = '0.1.0-SNAPSHOT'
+description = '한국 근로기준법 연차유급휴가 계산 라이브러리'
+
+java {
+    // 빌드는 21 로 하되
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    // Maven Central 필수 산출물
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    // 바이트코드는 17. release 를 쓰면 17 에 없는 API 참조를 컴파일 단계에서 잡아준다.
+    // (source/target 조합은 이걸 못 잡고 런타임 NoSuchMethodError 로 터진다)
+    options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:all'
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 런타임 의존성 없음. 의도된 제약이며 checkNoRuntimeDependencies 가 강제한다.
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.assertj:assertj-core:3.27.3'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
+}
+
+// 실수로 의존성이 끼어드는 걸 빌드에서 막는다.
+// 이 라이브러리의 핵심 가치가 "클래스패스 충돌 없음" 이므로 규칙으로 고정.
+tasks.register('checkNoRuntimeDependencies') {
+    def runtime = configurations.runtimeClasspath
+    doLast {
+        def found = runtime.resolvedConfiguration.resolvedArtifacts*.name
+        if (!found.isEmpty()) {
+            throw new GradleException(
+                "런타임 의존성이 추가되었다: ${found}\n" +
+                "이 라이브러리는 의존성 0 을 유지한다. 정말 필요하면 이 태스크를 먼저 지워라."
+            )
+        }
+    }
+}
+tasks.named('check') { dependsOn 'checkNoRuntimeDependencies' }
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'annual-leave-kr'
+
+            pom {
+                name = 'annual-leave-kr'
+                description = project.description
+                url = 'https://github.com/woosb/annual-leave-kr'
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'woosb'
+                        name = 'Sungbin Woo'
+                        email = 'woosb0115@gmail.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/woosb/annual-leave-kr.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/woosb/annual-leave-kr.git'
+                    url = 'https://github.com/woosb/annual-leave-kr'
+                }
+            }
+        }
+    }
+}
+
+signing {
+    // 로컬에서는 서명 없이 빌드되게 두고, CI 릴리즈에서만 켠다.
+    required { !version.toString().endsWith('SNAPSHOT') && gradle.taskGraph.hasTask('publish') }
+    def key = findProperty('signingKey') as String
+    def pw = findProperty('signingPassword') as String
+    if (key && pw) {
+        useInMemoryPgpKeys(key, pw)
+    }
+    sign publishing.publications.mavenJava
+}
+
+// NOTE: Central Portal 업로드는 0.1.0 릴리즈 시점에 붙인다.
+// maven-publish 는 아직 Portal API 를 직접 지원하지 않으므로
+// com.vanniktech.maven.publish 플러그인 또는 OSSRH Staging API 호환 엔드포인트를 쓴다.
+// 지금 단계에서는 publishToMavenLocal 로만 검증한다.
