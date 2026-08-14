@@ -39,7 +39,7 @@ class AnnualLeaveCalculatorTest {
                     .isEqualTo(LegalBasis.ARTICLE_60_1);
         }
 
-        @ParameterizedTest(name = "출근율 {2}/{1} → 15일 발생 여부 {3}")
+        @ParameterizedTest(name = "{0} 기준, 출근율 {2}/{1} → 15일 발생 여부 {3}")
         @CsvSource({
                 "2025-03-15, 248, 248, true",   // 100%
                 "2025-03-15, 248, 199, true",   // 80.2%
