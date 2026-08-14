@@ -47,7 +47,16 @@ leave.grants().get(0).basis().article();  // "근로기준법 제60조 제1항"
 JDK 21 이 없으면 `No matching toolchains found` 로 실패한다.
 
 ```bash
+# macOS
 brew install --cask temurin@21
+```
+
+Windows 는 IntelliJ 가 설치해둔 JDK 를 그대로 쓸 수 있다 (`~/.jdks/temurin-21.x`).
+다만 IntelliJ 밖의 셸에서 `gradlew` 를 돌리려면 `JAVA_HOME` 을 직접 잡아야 한다.
+안 잡으면 시스템 기본 JVM(대개 8)이 잡혀 `Gradle requires JVM 17 or later` 로 죽는다.
+
+```powershell
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\temurin-21.0.12"
 ```
 
 빌드는 21 로 하지만 **바이트코드는 17 로 떨어진다** (`options.release = 17`).
@@ -62,12 +71,6 @@ Spring Boot 3 이상 환경 전체를 커버하기 위한 선택이고, CI 에�
 DB 도 Docker 도 `.env` 도 필요 없다. 순수 단위 테스트뿐이다.
 여기서 깨지면 JDK 문제다.
 
-Gradle wrapper 는 레포에 포함되어 있지 않다면 한 번 생성해야 한다:
-
-```bash
-gradle wrapper --gradle-version 8.12
-```
-
 ### 3. 의존성 추가는 빌드가 막는다
 
 ```
@@ -80,8 +83,10 @@ gradle wrapper --gradle-version 8.12
 
 ## 미구현 조문 작업하는 법
 
-테스트가 명세다. `AnnualLeaveCalculatorTest` 에 미구현 조문이
-`@Disabled` 로 들어 있다.
+테스트가 명세다. 조문을 먼저 테스트로 적고, 그 다음에 구현한다.
+
+이미 적혀 있는 조문(제2항·제4항)은 `AnnualLeaveCalculatorTest` 에
+`@Disabled` 붙은 `@Nested` 클래스로 들어 있다.
 
 1. 해당 `@Disabled` 를 지운다
 2. `./gradlew test` — **red 를 확인한다**
@@ -90,6 +95,17 @@ gradle wrapper --gradle-version 8.12
 5. green
 
 red 를 안 보고 넘어가면 테스트가 실제로 뭘 검증하는지 알 수 없다.
+
+아직 적히지 않은 조문을 새로 들일 때는 0 번이 하나 더 붙는다:
+`LegalBasis` 에 상수를 추가하고, `@Nested` 클래스로 케이스를 먼저 적는다.
+케이스는 조문 텍스트에서 뽑는다 — 요건 충족, 요건 미달, 경계값(발생일 하루 전/당일), 상한.
+
+### `@Disabled` 는 초록색으로 보인다
+
+`@Disabled` 클래스는 테스트 로그에 아예 줄이 안 찍히고 skipped 로만 집계된다.
+`./gradlew test` 가 통과했다고 전 조문이 검증된 게 아니다.
+지금 실제로 도는 건 제1항 6건과 입력 검증 4건뿐이고, 제2항·제4항은 각각 skipped 1 이다.
+집계는 `build/reports/tests/test/index.html` 에서 확인한다.
 
 ## 구조
 
